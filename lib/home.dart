@@ -66,19 +66,30 @@ class _HomeState extends State<Home> {
   }
 
 Future<void> fetchDevices() async {
-    // Fetch device data from the database
-    final url = Uri.parse('http://192.168.0.187:5000/devices');
-    final response = await http.get(url);
+  // Fetch device data from the database
+  final url = Uri.parse('http://192.168.180.239:5000/devices/user');
+  final response = await http.get(
+    url,
+    headers: {'User-Agent': 'FlutterApp'}, // Set User-Agent header
+  );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> responseData = jsonDecode(response.body);
-      setState(() {
-        deviceEntries = responseData.map((device) => device as Map<String, dynamic>).toList();
-      });
+  if (response.statusCode == 200) {
+    if (response.headers['content-type']!.contains('text/html')) {
+      // Handle HTML response
+      print('Received HTML response');
+      // You can display an error message or do other handling here
     } else {
-      throw Exception('Failed to load devices');
+      // Handle JSON response
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      print('$responseData');
+      setState(() {
+        deviceEntries = List<Map<String, dynamic>>.from(responseData['devices']);
+      });
     }
+  } else {
+    throw Exception('Failed to load devices');
   }
+}
   
   @override
   Widget build(BuildContext context) {
@@ -171,30 +182,35 @@ Future<void> fetchDevices() async {
                     );
                   },
                 ),
-                 if (_isDevice)
-              ...deviceEntries.map((device) => Card(
-                    elevation: 3,
-                    child: ListTile(
-                      leading: Icon(
-                        device['status'] == 'connected' ? Icons.check_circle : Icons.cancel,
-                        color: device['status'] == 'connected' ? Colors.green : Colors.red,
-                      ),
-                      title: Text(device['name']),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('ID: ${device['id']}'),
-                          Text('Status: ${device['status']}'),
-                        ],
-                      ),
-                      trailing: Icon(Icons.more_vert),
-                      onTap: () {
-                        // Handle tapping on a device card
-                        print('Tapped on ${device['name']}');
-                      },
-                    ),
-                  )),
-                
+                if (_isDevice) // Display "Existing list" text only if _isDevice is true
+  const Text(
+    "Existing list",
+    style: TextStyle(fontSize: 22, color: Colors.indigo, fontWeight: FontWeight.bold),
+  ),
+if (_isDevice && deviceEntries.isNotEmpty) // Display the device list only if _isDevice is true and deviceEntries is not empty
+  ...deviceEntries.map((device) => Card(
+        elevation: 3,
+        child: ListTile(
+          leading: Icon(
+            device['status'] == 'connected' ? Icons.check_circle : Icons.cancel,
+            color: device['status'] == 'connected' ? Colors.green : Colors.red,
+          ),
+          title: Text(device['name'] ?? ''),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ID: ${device['iddevice'] ?? ''}'), // Update key to 'iddevice'
+              Text('Status: ${device['status'] ?? ''}'),
+            ],
+          ),
+          trailing: Icon(Icons.more_vert),
+          onTap: () {
+            // Handle tapping on a device card
+            print('Tapped on ${device['name']}');
+          },
+        ),
+      )),
+
             ],
           ),
         ),
@@ -280,9 +296,9 @@ Future<void> fetchDevices() async {
 
             // Process recognized words
             processRecognizedWords(val.recognizedWords);
-
+            
             // Check if all variables are captured and stop listeningif so
-            if (!isListening) {
+            if (!isListening ) {
               stopListening();
             }
           },
@@ -503,67 +519,104 @@ try{
   }
 }
 
-TimeOfDay convertTime(String timeText) {
-  final timeRegex = RegExp(r'(\d{1,2}):(\d{2}) (AM|PM)');
-  final match = timeRegex.firstMatch(timeText);
-  if (match != null) {
-    final hour = int.parse(match.group(1)!);
-    final minute = int.parse(match.group(2)!);
-    final period = match.group(3)!;
-    if (period == 'AM' && hour == 12) {
-      return TimeOfDay(hour: 0, minute: minute);
-    } else if (period == 'PM' && hour < 12) {
-      return TimeOfDay(hour: hour + 12, minute: minute);
-    } else {
+void convertData() {
+    convertEntries();
+    printUpdatedLists();
+  }
+void printUpdatedLists() {
+    print('Updated Medication list : $medicationEntries');
+    print('Updated Advice list : $adviceEntries');
+    print('Updated Appointment list : $appointmentEntries');
+  }
+  void convertEntries() {
+    medicationEntries.forEach((entry) {
+      // Convert time and date if needed
+      String timeText = entry['time'];
+      entry['time'] = _convertTime(timeText);
+
+      String dateText = entry['date'];
+      entry['date'] = _convertDate(dateText);
+    });
+
+    adviceEntries.forEach((entry) {
+      // Convert time and date if needed
+      String timeText = entry['time'];
+      entry['time'] = _convertTime(timeText);
+
+      String dateText = entry['date'];
+      entry['date'] = _convertDate(dateText);
+    });
+
+    appointmentEntries.forEach((entry) {
+      // Convert time and date if needed
+      String timeText = entry['time'];
+      entry['time'] = _convertTime(timeText);
+
+      String dateText = entry['date'];
+      entry['date'] = _convertDate(dateText);
+    });
+  }
+
+  TimeOfDay _convertTime(String timeText) {
+    final timeRegex = RegExp(r'(\d{1,2}):(\d{2}) (AM|PM)');
+    final match = timeRegex.firstMatch(timeText);
+    if (match != null) {
+      final hour = int.parse(match.group(1)!);
+      final minute = int.parse(match.group(2)!);
+      final period = match.group(3)!;
+      if (period == 'AM' && hour == 12) {
+        return TimeOfDay(hour: 0, minute: minute);
+      } else if (period == 'PM' && hour < 12) {
+        return TimeOfDay(hour: hour + 12, minute: minute);
+      } else {
+        return TimeOfDay(hour: hour, minute: minute);
+      }
+    }
+
+    final timeRegex24 = RegExp(r'(\d{1,2}):(\d{2})');
+    final match24 = timeRegex24.firstMatch(timeText);
+    if (match24 != null) {
+      final hour = int.parse(match24.group(1)!);
+      final minute = int.parse(match24.group(2)!);
       return TimeOfDay(hour: hour, minute: minute);
     }
+
+    throw FormatException('Invalid time format');
   }
 
-  final timeRegex24 = RegExp(r'(\d{1,2}):(\d{2})');
-  final match24 = timeRegex24.firstMatch(timeText);
-  if (match24 != null) {
-    final hour = int.parse(match24.group(1)!);
-    final minute = int.parse(match24.group(2)!);
-    return TimeOfDay(hour: hour, minute: minute);
-  }
+  DateTime _convertDate(String dateText) {
+    final now = DateTime.now();
 
-  throw FormatException('Invalid time format');
-}
-
-DateTime convertDate(String dateText) {
-  final now = DateTime.now();
-
-  if (dateText.toLowerCase() == 'today') {
-    return now;
-  }
-
-  final dayOfWeek = DateFormat('EEEE').format(now).toLowerCase();
-  final nextDayOfWeek = DateFormat('EEEE').format(now.add(Duration(days: 7))).toLowerCase();
-
-  if (dateText.toLowerCase().startsWith('next ')) {
-    final day = dateText.substring(5).toLowerCase();
-    if (day == dayOfWeek) {
-      return now.add(Duration(days: 7));
-    } else if (day == nextDayOfWeek) {
-      return now.add(Duration(days: 14));
-    } else {
-      final daysUntilNext = DateTime.daysPerWeek - now.weekday + DateFormat('EEEE').parse(day).weekday;
-      return now.add(Duration(days: daysUntilNext));
+    if (dateText.toLowerCase() == 'today') {
+      return now;
     }
+
+    final dayOfWeek = DateFormat('EEEE').format(now).toLowerCase();
+    final nextDayOfWeek = DateFormat('EEEE').format(now.add(Duration(days: 7))).toLowerCase();
+
+    if (dateText.toLowerCase().startsWith('next ')) {
+      final day = dateText.substring(5).toLowerCase();
+      if (day == dayOfWeek) {
+        return now.add(Duration(days: 7));
+      } else if (day == nextDayOfWeek) {
+        return now.add(Duration(days: 14));
+      } else {
+        final daysUntilNext = DateTime.daysPerWeek - now.weekday + DateFormat('EEEE').parse(day).weekday;
+        return now.add(Duration(days: daysUntilNext));
+      }
+    }
+
+    final dateRegex = RegExp(r'(\d{1,2})-(\d{1,2})-(\d{4})');
+    final match = dateRegex.firstMatch(dateText);
+    if (match != null) {
+      final day = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final year = int.parse(match.group(3)!);
+      return DateTime(year, month, day);
+    }
+
+    final dayOfWeekIndex = DateFormat('EEEE').parse(dayOfWeek).weekday;
+    final daysUntilNext = DateTime.daysPerWeek - dayOfWeekIndex + DateFormat('EEEE').parse(dateText).weekday;
+    return now.add(Duration(days: daysUntilNext));
   }
-
-  final dateRegex = RegExp(r'(\d{1,2})-(\d{1,2})-(\d{4})');
-  final match = dateRegex.firstMatch(dateText);
-  if (match != null) {
-    final day = int.parse(match.group(1)!);
-    final month = int.parse(match.group(2)!);
-    final year = int.parse(match.group(3)!);
-    return DateTime(year, month, day);
-  }
-
-  final dayOfWeekIndex = DateFormat('EEEE').parse(dayOfWeek).weekday;
-  final daysUntilNext = DateTime.daysPerWeek - dayOfWeekIndex + DateFormat('EEEE').parse(dateText).weekday;
-  return now.add(Duration(days: daysUntilNext));
-}
-
 }
