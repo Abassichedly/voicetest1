@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:avatar_glow/avatar_glow.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class Home extends StatefulWidget {
@@ -17,8 +20,12 @@ class _HomeState extends State<Home> {
   bool isListening = false;
   bool _isReminder = false;
   bool _isAppointment = false;
+  bool _isDevice = false;
   List<Map<String, dynamic>> medicationEntries = [];
   List<Map<String, dynamic>> adviceEntries = [];
+  List<Map<String, dynamic>> appointmentEntries = [];
+  List<Map<String, dynamic>> deviceEntries = [];
+
 
   List<String> reminderVariables = [
     'Type',
@@ -45,6 +52,7 @@ class _HomeState extends State<Home> {
     super.initState();
     speech = stt.SpeechToText();
     initializeSpeech();
+    fetchDevices();
   }
 
   void initializeSpeech() async {
@@ -57,6 +65,21 @@ class _HomeState extends State<Home> {
     }
   }
 
+Future<void> fetchDevices() async {
+    // Fetch device data from the database
+    final url = Uri.parse('http://192.168.0.187:5000/devices');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> responseData = jsonDecode(response.body);
+      setState(() {
+        deviceEntries = responseData.map((device) => device as Map<String, dynamic>).toList();
+      });
+    } else {
+      throw Exception('Failed to load devices');
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -112,8 +135,8 @@ class _HomeState extends State<Home> {
                         if (reminderVariables[index] == 'Description') Text('Enter a valid description'),
                         if (reminderVariables[index] == 'Date') Text('Say "Date" to set the date'),
                         if (reminderVariables[index] == 'Time') Text('Say "Time" to set the time'),
-                        if (reminderVariables[index] == 'Alarm' || reminderVariables[index] == 'Notification')
-                          Text('Yes or no'),
+                        if (reminderVariables[index] == 'Alarm' ||
+                            reminderVariables[index] == 'Notification') Text('Yes or no'),
                         SizedBox(height: 10),
                       ],
                     );
@@ -135,15 +158,43 @@ class _HomeState extends State<Home> {
                             color: appointmentVariableSpoken[index] ? Colors.green : Colors.black,
                           ),
                         ),
-                        if (appointmentVariables[index] == 'Date') Text('Say "Date" to set the date'),
-                        if (appointmentVariables[index] == 'Doctor') Text('Say the name of the doctor'),
-                        if (appointmentVariables[index] == 'Specialty') Text('Say the specialty'),
-                        if (appointmentVariables[index] == 'Time') Text('Say "Time" to set the time'),
+                        if (appointmentVariables[index] == 'Date')
+                          Text('Say "Date" to set the date'),
+                        if (appointmentVariables[index] == 'Doctor')
+                          Text('Say the name of the doctor'),
+                        if (appointmentVariables[index] == 'Specialty')
+                          Text('Say the specialty'),
+                        if (appointmentVariables[index] == 'Time')
+                          Text('Say "Time" to set the time'),
                         SizedBox(height: 10),
                       ],
                     );
                   },
                 ),
+                 if (_isDevice)
+              ...deviceEntries.map((device) => Card(
+                    elevation: 3,
+                    child: ListTile(
+                      leading: Icon(
+                        device['status'] == 'connected' ? Icons.check_circle : Icons.cancel,
+                        color: device['status'] == 'connected' ? Colors.green : Colors.red,
+                      ),
+                      title: Text(device['name']),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ID: ${device['id']}'),
+                          Text('Status: ${device['status']}'),
+                        ],
+                      ),
+                      trailing: Icon(Icons.more_vert),
+                      onTap: () {
+                        // Handle tapping on a device card
+                        print('Tapped on ${device['name']}');
+                      },
+                    ),
+                  )),
+                
             ],
           ),
         ),
@@ -165,6 +216,7 @@ class _HomeState extends State<Home> {
                 setState(() {
                   _isReminder = true;
                   _isAppointment = false;
+                  _isDevice=false;
                 });
                 listen(); // Start listening for speech input
               },
@@ -176,6 +228,7 @@ class _HomeState extends State<Home> {
                 setState(() {
                   _isAppointment = true;
                   _isReminder = false;
+                  _isDevice=false;
                 });
                 listen(); // Start listening for speech input
               },
@@ -187,6 +240,7 @@ class _HomeState extends State<Home> {
                 setState(() {
                   _isReminder = false;
                   _isAppointment = false;
+                  _isDevice=true;
                 });
                 listen(); // Start listening for speech input
               },
@@ -198,6 +252,8 @@ class _HomeState extends State<Home> {
                 setState(() {
                   _isReminder = false;
                   _isAppointment = false;
+                  _isDevice=false;
+
                 });
                 listen(); // Start listening for speech input
               },
@@ -225,19 +281,15 @@ class _HomeState extends State<Home> {
             // Process recognized words
             processRecognizedWords(val.recognizedWords);
 
-            // Stop listening if all required data is captured
-            if ((_isReminder || _isAppointment) && allVariablesCaptured()) {
+            // Check if all variables are captured and stop listeningif so
+            if (!isListening) {
               stopListening();
             }
           },
-          localeId: 'en_US', // Set language to English
         );
       } else {
         print('Speech recognition not available');
       }
-    } else {
-      setState(() => isListening = false);
-      speech.stop();
     }
   }
 
@@ -254,18 +306,8 @@ class _HomeState extends State<Home> {
     }
   }
 
-  bool allVariablesCaptured() {
-    // Check if all reminder or appointment variables have been captured
+  void processRecognizedWords(String recognizedWords) {
     if (_isReminder) {
-      return reminderVariableSpoken.every((spoken) => spoken);
-    } else if (_isAppointment) {
-      return appointmentVariableSpoken.every((spoken) => spoken);
-    }
-    return false;
-  }
-
-void processRecognizedWords(String recognizedWords) {
-  if (_isReminder) {
     // Handle reminder-specific logic
     Map<String, dynamic> entry = {
       'type': null,
@@ -276,7 +318,7 @@ void processRecognizedWords(String recognizedWords) {
       'alarm': null,
       'notification': null,
     };
-
+try{
     for (int i = 0; i < reminderVariables.length; i++) {
       String parameter = reminderVariables[i];
       int parameterIndex = recognizedWords.toLowerCase().indexOf(parameter.toLowerCase());
@@ -285,7 +327,6 @@ void processRecognizedWords(String recognizedWords) {
         setState(() {
           reminderVariableSpoken[i] = true;
         });
-
         // Extract data for the parameter
         String parameterData;
         int nextParameterIndex = (i + 1 < reminderVariables.length)
@@ -309,14 +350,8 @@ void processRecognizedWords(String recognizedWords) {
           } else if (parameter.toLowerCase() == 'description') {
             entry['description'] = parameterData;
           } else if (parameter.toLowerCase() == 'date') {
-            if (parameterData.toLowerCase() == 'date') {
-              if (adviceEntries.isNotEmpty) {
-                _selectDate();
-              }
-              return; // Stop processing other parameters until the date is selected
-            } else {
               entry['date'] = parameterData;
-            }
+            
           } else if (parameter.toLowerCase() == 'time') {
             if (parameterData.toLowerCase() == 'now') {
               // Set time to current time
@@ -336,216 +371,199 @@ void processRecognizedWords(String recognizedWords) {
         }
       }
     }
+}catch(e){print('process problem : $e');}
+try{
+      // Check if all required data is captured
+      bool allDataCaptured = entry['type'] != null &&
+          entry['title'] != null &&
+          entry['description'] != null &&
+          entry['date'] != null &&
+          entry['time'] != null &&
+          (entry['alarm'] == 'yes' || entry['alarm'] == 'no') &&
+          (entry['notification'] == 'yes' || entry['notification'] == 'no');
 
-    // Check if all required data is captured
-    if (allVariablesCaptured()) {
-      // Add entry to the medication or advice list based on type
-      if (entry['type'] == 'medication') {
-        setState(() {
-          medicationEntries.add(entry);
-        });
-        print('Medication list : $medicationEntries');
-      } else if (entry['type'] == 'advice') {
-        if (adviceEntries.isNotEmpty) {
+      if (allDataCaptured) {
+        
+        if (entry['type'] == 'medication') {
           setState(() {
-            adviceEntries.last['date'] = entry['date'];
-          });
-          print('Advice list : $adviceEntries');
+            medicationEntries.add(entry);
+             });
+          print('Medication list : $medicationEntries');
+          // ... (your existing code)
+        } else if (entry['type'] == 'advice') {
+          if (adviceEntries.isNotEmpty) {
+            setState(() {
+              adviceEntries.last['date'] = entry['date'];
+            });
+            print('Advice list : $adviceEntries');
+          }
         }
+
+        // Replace the text with the recognized data
+        setState(() {
+          txt = recognizedWords;
+        });
+
+        // Print the recognized words and extracted data for debugging
+        print('Recognized words: $recognizedWords');
+        print('Extracted data: $entry');
+        print('-----------------------------------');
+
+        // Stop listening if all required data is captured
+        stopListening();
       }
-
-      // Replace the text with the recognized data
-      setState(() {
-        txt = recognizedWords;
-      });
-
-      // Print the recognized words and extracted data for debugging
-      print('Recognized words: $recognizedWords');
-      print('Extracted data: $entry');
-      print('-----------------------------------');
-
-      // Stop listening if all required data is captured
-      stopListening();
+      }catch (e){print(" all data captured has a problem : $e");}
     }
-  } else if (_isAppointment) {
-    // Handle appointment-specific logic
+     else if (_isAppointment) {
     Map<String, dynamic> entry = {
+      'uid': null,
       'date': null,
       'doctor': null,
       'specialty': null,
       'time': null,
     };
 
-    for (int i = 0; i < appointmentVariables.length; i++) {
-      String parameter = appointmentVariables[i];
-      int parameterIndex = recognizedWords.toLowerCase().indexOf(parameter.toLowerCase());
+    bool allDataCaptured = false;
 
-      if (parameterIndex != -1) {
-        setState(() {
-          appointmentVariableSpoken[i] = true;
-        });
+    try {
+      for (int i = 0; i < appointmentVariables.length && !allDataCaptured; i++) {
+        String parameter = appointmentVariables[i];
+        int parameterIndex = recognizedWords.toLowerCase().indexOf(parameter.toLowerCase());
 
-        String parameterData;
-        int nextParameterIndex = (i + 1 < appointmentVariables.length)
-            ? recognizedWords.toLowerCase().indexOf(appointmentVariables[i + 1].toLowerCase())
-            : -1;
+        if (parameterIndex != -1) {
+          setState(() {
+            appointmentVariableSpoken[i] = true;
+          });
 
-        if (nextParameterIndex == -1) {
-          parameterData = recognizedWords.substring(parameterIndex + parameter.length).trim();
-        } else {
-          parameterData = recognizedWords.substring(parameterIndex + parameter.length, nextParameterIndex).trim();
-        }
+          // Extract data for the parameter
+          String parameterData;
+          int nextParameterIndex;
+          if (i < appointmentVariables.length - 1) {
+            nextParameterIndex = recognizedWords.toLowerCase().indexOf(appointmentVariables[i + 1].toLowerCase(), parameterIndex + parameter.length);
+          } else {
+            nextParameterIndex = recognizedWords.length;
+          }
 
-        if (parameterData.isNotEmpty) {
-          if (parameter.toLowerCase() == 'date') {
-            if (parameterData.toLowerCase() == 'date') {
-              _selectDate();
-              return; // Stop processing other parameters until the date is selected
-            } else {
-              entry['date'] = parameterData;
+          if (nextParameterIndex == parameterIndex + parameter.length) {
+            // If the next parameter is not found, set the nextParameterIndex to the end of the recognizedWords string
+            nextParameterIndex = recognizedWords.length;
+          }
+
+          if (nextParameterIndex == -1) {
+            // If no next parameter is found, use the rest of the recognized words
+            parameterData = recognizedWords.substring(parameterIndex + parameter.length).trim();
+          } else {
+            // If a next parameter is found, use the substring up to the next parameter name
+            parameterData = recognizedWords.substring(parameterIndex + parameter.length, nextParameterIndex).trim();
+          }
+
+          // Process the extracted data
+          if (parameterData.isNotEmpty) {
+            if (parameter.toLowerCase() == 'date') {
+              entry['date'] = parameterData.toLowerCase();
+            } else if (parameter.toLowerCase() == 'doctor') {
+              entry['doctor'] = parameterData;
+            } else if (parameter.toLowerCase() == 'specialty') {
+              entry['specialty'] = parameterData;
+            } else if (parameter.toLowerCase() == 'time') {
+              if (parameterData.toLowerCase() == 'now') {
+                // Set time to current time
+                entry['time'] = TimeOfDay.now().format(context);
+              } else {
+                entry['time'] = parameterData.toLowerCase();
+              }
             }
-          } else if (parameter.toLowerCase() == 'doctor' || parameter.toLowerCase() == 'dr') {
-            entry['doctor'] = parameterData;
-          } else if (parameter.toLowerCase() == 'specialty') {
-            entry['specialty'] = parameterData;
-          } else if (parameter.toLowerCase() == 'time') {
-            if (parameterData.toLowerCase() == 'now') {
-              // Set time to current time
-              entry['time'] = TimeOfDay.now().format(context);
-            } else {
-              entry['time'] = parameterData;
-            }
+          }
+
+          // Check if all required data is captured
+          allDataCaptured = 
+              entry['date'] != null &&
+              entry['doctor'] != null &&
+              entry['specialty'] != null &&
+              entry['time'] != null;
+
+          if (allDataCaptured) {
+            setState(() {
+              appointmentEntries.add(entry);
+            });
+            print('Appoitment list : $appointmentEntries');
+            txt = recognizedWords;
+            stopListening();
           }
         }
       }
+    } catch (e) {
+      print('process problem : $e');
     }
 
-    // Check if all required data is captured
-    if (allVariablesCaptured()) {
-      setState(() {
-        txt = recognizedWords;
-      });
-
-      print('Recognized words: $recognizedWords');
-      print('Extracted data: $entry');
-      print('-----------------------------------');
-
-      stopListening();
-    }
+    // Print the recognized words and extracted data for debugging
+    print('Recognized words: $recognizedWords');
+    print('Extracted data: $entry');
+    print('-----------------------------------');
   }
 }
 
-  Future<void> _selectDate() async {
-  DateTime? pickedDate;
-  TimeOfDay? pickedTime;
-  String command = '';
-
-  // Check if the user spoke a command related to the date
-  if (_isReminder) {
-    int commandIndex = reminderVariables.indexOf('Date');
-    if (commandIndex != -1 && reminderVariableSpoken[commandIndex]) {
-      String recognizedWords = txt.toLowerCase();
-      int commandStartIndex = recognizedWords.indexOf('date') + 4;
-      int commandEndIndex = recognizedWords.indexOf('to');
-      if (commandEndIndex == -1) {
-        commandEndIndex = recognizedWords.length;
-      }
-      command = recognizedWords.substring(commandStartIndex, commandEndIndex).trim();
+TimeOfDay convertTime(String timeText) {
+  final timeRegex = RegExp(r'(\d{1,2}):(\d{2}) (AM|PM)');
+  final match = timeRegex.firstMatch(timeText);
+  if (match != null) {
+    final hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+    final period = match.group(3)!;
+    if (period == 'AM' && hour == 12) {
+      return TimeOfDay(hour: 0, minute: minute);
+    } else if (period == 'PM' && hour < 12) {
+      return TimeOfDay(hour: hour + 12, minute: minute);
+    } else {
+      return TimeOfDay(hour: hour, minute: minute);
     }
   }
 
-  // Determine the initial date based on the spoken command
-  if (command.contains('today')) {
-    pickedDate = DateTime.now();
-  } else if (command.contains('tomorrow')) {
-    pickedDate = DateTime.now().add(Duration(days: 1));
-  } else if (command.contains('next')) {
-    // Logic for picking the next day of the week
-    // ...
-  } else {
-    pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(DateTime.now().year + 5),
-    );
+  final timeRegex24 = RegExp(r'(\d{1,2}):(\d{2})');
+  final match24 = timeRegex24.firstMatch(timeText);
+  if (match24 != null) {
+    final hour = int.parse(match24.group(1)!);
+    final minute = int.parse(match24.group(2)!);
+    return TimeOfDay(hour: hour, minute: minute);
   }
 
-  // If the user selected a date, prompt for time selection
-  if (pickedDate != null) {
-    pickedTime = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-  }
-
-  // If the user selected both date and time, update the UI and spoken variables
-  if (pickedDate != null && pickedTime != null) {
-    // Combine date and time
-    pickedDate = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
-
-    setState(() {
-      // Format date as yyyy-MM-dd
-      String formattedDate = '${pickedDate!.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}';
-      txt = 'Date selected: $formattedDate, Time selected: ${pickedTime!.format(context)}';
-      if (_isReminder) {
-        medicationEntries.last['date'] = formattedDate;
-        medicationEntries.last['time'] = pickedTime.format(context);
-        reminderVariableSpoken[3] = true; // Date
-        reminderVariableSpoken[4] = true; // Time
-      } else if (_isAppointment) {
-        adviceEntries.last['date'] = formattedDate;
-        adviceEntries.last['time'] = pickedTime.format(context);
-        appointmentVariableSpoken[0] = true; // Date
-        appointmentVariableSpoken[3] = true; // Time
-      }
-    });
-
-    // Print the selected date and time and the updated list
-    print('Selected date: $pickedDate, Selected time: $pickedTime');
-    print('Medication entries: $medicationEntries');
-    print('Advice entries: $adviceEntries');
-  }
+  throw FormatException('Invalid time format');
 }
 
+DateTime convertDate(String dateText) {
+  final now = DateTime.now();
 
-  DateTime _getNextDay(String command) {
-    DateTime now = DateTime.now();
-    int dayIndex = -1;
-
-    if (command.contains('monday')) {
-      dayIndex = 1;
-    } else if (command.contains('tuesday')) {
-      dayIndex = 2;
-    } else if (command.contains('wednesday')) {
-      dayIndex = 3;
-    } else if (command.contains('thursday')) {
-      dayIndex = 4;
-    } else if (command.contains('friday')) {
-      dayIndex = 5;
-    } else if (command.contains('saturday')) {
-      dayIndex = 6;
-    } else if (command.contains('sunday')) {
-      dayIndex = 7;
-    }
-
-    int daysUntilNext = dayIndex - now.weekday;
-    if (daysUntilNext <= 0) {
-      daysUntilNext += 7;
-    }
-
-    return now.add(Duration(days: daysUntilNext));
+  if (dateText.toLowerCase() == 'today') {
+    return now;
   }
 
-  String _formatTime(int hour, int minute) {
-    String hourStr = hour.toString().padLeft(2, '0');
-    String minuteStr = minute.toString().padLeft(2, '0');
-    return '$hourStr:$minuteStr';
+  final dayOfWeek = DateFormat('EEEE').format(now).toLowerCase();
+  final nextDayOfWeek = DateFormat('EEEE').format(now.add(Duration(days: 7))).toLowerCase();
+
+  if (dateText.toLowerCase().startsWith('next ')) {
+    final day = dateText.substring(5).toLowerCase();
+    if (day == dayOfWeek) {
+      return now.add(Duration(days: 7));
+    } else if (day == nextDayOfWeek) {
+      return now.add(Duration(days: 14));
+    } else {
+      final daysUntilNext = DateTime.daysPerWeek - now.weekday + DateFormat('EEEE').parse(day).weekday;
+      return now.add(Duration(days: daysUntilNext));
+    }
   }
+
+  final dateRegex = RegExp(r'(\d{1,2})-(\d{1,2})-(\d{4})');
+  final match = dateRegex.firstMatch(dateText);
+  if (match != null) {
+    final day = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final year = int.parse(match.group(3)!);
+    return DateTime(year, month, day);
+  }
+
+  final dayOfWeekIndex = DateFormat('EEEE').parse(dayOfWeek).weekday;
+  final daysUntilNext = DateTime.daysPerWeek - dayOfWeekIndex + DateFormat('EEEE').parse(dateText).weekday;
+  return now.add(Duration(days: daysUntilNext));
+}
+
 }
