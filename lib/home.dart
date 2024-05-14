@@ -43,7 +43,7 @@ class _HomeState extends State<Home> {
     'Specialty',
     'Time',
   ];
-
+ 
   List<bool> reminderVariableSpoken = List.filled(7, false);
   List<bool> appointmentVariableSpoken = List.filled(4, false);
 
@@ -90,7 +90,7 @@ Future<void> fetchDevices() async {
     throw Exception('Failed to load devices');
   }
 }
-  
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,7 +103,7 @@ Future<void> fetchDevices() async {
       floatingActionButton: AvatarGlow(
         animate: isListening,
         glowColor: Theme.of(context).primaryColor,
-        duration: Duration(milliseconds: 2000),
+        duration: const Duration(milliseconds: 2000),
         repeat: true,
         child: FloatingActionButton(
           onPressed: _openOptionsList,
@@ -112,13 +112,13 @@ Future<void> fetchDevices() async {
       ),
       body: SingleChildScrollView(
         child: Container(
-          padding: EdgeInsets.fromLTRB(30, 30, 30, 150),
+          padding: const EdgeInsets.fromLTRB(30, 30, 30, 150),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 txt,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 30,
                   color: Colors.indigo,
                   fontStyle: FontStyle.italic,
@@ -141,14 +141,14 @@ Future<void> fetchDevices() async {
                             color: reminderVariableSpoken[index] ? Colors.green : Colors.black,
                           ),
                         ),
-                        if (reminderVariables[index] == 'Type') Text('Advice or medication'),
-                        if (reminderVariables[index] == 'Title') Text('Enter a valid title'),
-                        if (reminderVariables[index] == 'Description') Text('Enter a valid description'),
-                        if (reminderVariables[index] == 'Date') Text('Say "Date" to set the date'),
-                        if (reminderVariables[index] == 'Time') Text('Say "Time" to set the time'),
+                        if (reminderVariables[index] == 'Type') const Text('Advice or medication'),
+                        if (reminderVariables[index] == 'Title') const Text('Enter a valid title'),
+                        if (reminderVariables[index] == 'Description') const Text('Enter a valid description'),
+                        if (reminderVariables[index] == 'Date') const Text('Say "Date" to set the date'),
+                        if (reminderVariables[index] == 'Time') const Text('Say "Time" to set the time'),
                         if (reminderVariables[index] == 'Alarm' ||
-                            reminderVariables[index] == 'Notification') Text('Yes or no'),
-                        SizedBox(height: 10),
+                            reminderVariables[index] == 'Notification') const Text('Yes or no'),
+                        const SizedBox(height: 10),
                       ],
                     );
                   },
@@ -170,14 +170,14 @@ Future<void> fetchDevices() async {
                           ),
                         ),
                         if (appointmentVariables[index] == 'Date')
-                          Text('Say "Date" to set the date'),
+                          const Text('Say "Date" to set the date'),
                         if (appointmentVariables[index] == 'Doctor')
-                          Text('Say the name of the doctor'),
+                          const Text('Say the name of the doctor'),
                         if (appointmentVariables[index] == 'Specialty')
-                          Text('Say the specialty'),
+                          const Text('Say the specialty'),
                         if (appointmentVariables[index] == 'Time')
-                          Text('Say "Time" to set the time'),
-                        SizedBox(height: 10),
+                          const Text('Say "Time" to set the time'),
+                        const SizedBox(height: 10),
                       ],
                     );
                   },
@@ -203,7 +203,7 @@ if (_isDevice && deviceEntries.isNotEmpty) // Display the device list only if _i
               Text('Status: ${device['status'] ?? ''}'),
             ],
           ),
-          trailing: Icon(Icons.more_vert),
+          trailing: const Icon(Icons.more_vert),
           onTap: () {
             // Handle tapping on a device card
             print('Tapped on ${device['name']}');
@@ -226,7 +226,7 @@ if (_isDevice && deviceEntries.isNotEmpty) // Display the device list only if _i
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             ListTile(
-              title: Text('Set Reminder'),
+              title: const Text('Set Reminder'),
               onTap: () {
                 Navigator.pop(context);
                 setState(() {
@@ -238,7 +238,7 @@ if (_isDevice && deviceEntries.isNotEmpty) // Display the device list only if _i
               },
             ),
             ListTile(
-              title: Text('Set Appointment'),
+              title: const Text('Set Appointment'),
               onTap: () {
                 Navigator.pop(context);
                 setState(() {
@@ -250,7 +250,7 @@ if (_isDevice && deviceEntries.isNotEmpty) // Display the device list only if _i
               },
             ),
             ListTile(
-              title: Text('Set Home Devices'),
+              title: const Text('Set Home Devices'),
               onTap: () {
                 Navigator.pop(context);
                 setState(() {
@@ -262,7 +262,7 @@ if (_isDevice && deviceEntries.isNotEmpty) // Display the device list only if _i
               },
             ),
             ListTile(
-              title: Text('Emergency Call'),
+              title: const Text('Emergency Call'),
               onTap: () {
                 Navigator.pop(context);
                 setState(() {
@@ -427,6 +427,7 @@ try{
 
         // Stop listening if all required data is captured
         stopListening();
+        convertData();
       }
       }catch (e){print(" all data captured has a problem : $e");}
     }
@@ -505,6 +506,7 @@ try{
             print('Appoitment list : $appointmentEntries');
             txt = recognizedWords;
             stopListening();
+            convertData();
           }
         }
       }
@@ -512,100 +514,65 @@ try{
       print('process problem : $e');
     }
 
-    // Print the recognized words and extracted data for debugging
     print('Recognized words: $recognizedWords');
     print('Extracted data: $entry');
     print('-----------------------------------');
   }
 }
 
-void convertData() {
+ void convertData() {
     convertEntries();
     printUpdatedLists();
   }
-void printUpdatedLists() {
+
+  void printUpdatedLists() {
     print('Updated Medication list : $medicationEntries');
     print('Updated Advice list : $adviceEntries');
     print('Updated Appointment list : $appointmentEntries');
   }
+
   void convertEntries() {
-    medicationEntries.forEach((entry) {
-      // Convert time and date if needed
-      String timeText = entry['time'];
-      entry['time'] = _convertTime(timeText);
+  medicationEntries.forEach((entry) {
+    // Convert time and date if needed
+    String timeText = entry['time'];
+    entry['time'] = _convertTime(timeText);
 
-      String dateText = entry['date'];
-      entry['date'] = _convertDate(dateText);
-    });
+    String dateText = entry['date'];
+    entry['date'] = _convertDate(dateText);
+  });
 
-    adviceEntries.forEach((entry) {
-      // Convert time and date if needed
-      String timeText = entry['time'];
-      entry['time'] = _convertTime(timeText);
+  adviceEntries.forEach((entry) {
+    // Convert time and date if needed
+    String timeText = entry['time'];
+    entry['time'] = _convertTime(timeText);
 
-      String dateText = entry['date'];
-      entry['date'] = _convertDate(dateText);
-    });
+    String dateText = entry['date'];
+    entry['date'] = _convertDate(dateText);
+  });
 
-    appointmentEntries.forEach((entry) {
-      // Convert time and date if needed
-      String timeText = entry['time'];
-      entry['time'] = _convertTime(timeText);
+  appointmentEntries.forEach((entry) {
+    // Convert time and date if needed
+    String timeText = entry['time'];
+    entry['time'] = _convertTime(timeText);
 
-      String dateText = entry['date'];
-      entry['date'] = _convertDate(dateText);
-    });
-  }
+    String dateText = entry['date'];
+    entry['date'] = _convertDate(dateText);
+  });
+}
 
-  TimeOfDay _convertTime(String timeText) {
-    final timeRegex = RegExp(r'(\d{1,2}):(\d{2}) (AM|PM)');
-    final match = timeRegex.firstMatch(timeText);
-    if (match != null) {
-      final hour = int.parse(match.group(1)!);
-      final minute = int.parse(match.group(2)!);
-      final period = match.group(3)!;
-      if (period == 'AM' && hour == 12) {
-        return TimeOfDay(hour: 0, minute: minute);
-      } else if (period == 'PM' && hour < 12) {
-        return TimeOfDay(hour: hour + 12, minute: minute);
-      } else {
-        return TimeOfDay(hour: hour, minute: minute);
-      }
-    }
+DateTime _convertDate(String dateText) {
+  final now = DateTime.now();
 
-    final timeRegex24 = RegExp(r'(\d{1,2}):(\d{2})');
-    final match24 = timeRegex24.firstMatch(timeText);
-    if (match24 != null) {
-      final hour = int.parse(match24.group(1)!);
-      final minute = int.parse(match24.group(2)!);
-      return TimeOfDay(hour: hour, minute: minute);
-    }
-
-    throw FormatException('Invalid time format');
-  }
-
-  DateTime _convertDate(String dateText) {
-    final now = DateTime.now();
-
-    if (dateText.toLowerCase() == 'today') {
-      return now;
-    }
-
-    final dayOfWeek = DateFormat('EEEE').format(now).toLowerCase();
-    final nextDayOfWeek = DateFormat('EEEE').format(now.add(Duration(days: 7))).toLowerCase();
-
-    if (dateText.toLowerCase().startsWith('next ')) {
-      final day = dateText.substring(5).toLowerCase();
-      if (day == dayOfWeek) {
-        return now.add(Duration(days: 7));
-      } else if (day == nextDayOfWeek) {
-        return now.add(Duration(days: 14));
-      } else {
-        final daysUntilNext = DateTime.daysPerWeek - now.weekday + DateFormat('EEEE').parse(day).weekday;
-        return now.add(Duration(days: daysUntilNext));
-      }
-    }
-
+  if (dateText.toLowerCase() == 'today') {
+    return DateTime(now.year, now.month, now.day);
+  } else if (dateText.toLowerCase() == 'tomorrow') {
+    return DateTime(now.year, now.month, now.day + 1);
+  } else if (dateText.toLowerCase().startsWith('next ')) {
+    final day = dateText.substring(5).toLowerCase();
+    final dayOfWeekIndex = DateFormat('EEEE').parse(day).weekday;
+    final daysUntilNext = DateTime.daysPerWeek - dayOfWeekIndex + DateFormat('EEEE').parse(day).weekday;
+    return now.add(Duration(days: daysUntilNext));
+  } else {
     final dateRegex = RegExp(r'(\d{1,2})-(\d{1,2})-(\d{4})');
     final match = dateRegex.firstMatch(dateText);
     if (match != null) {
@@ -614,9 +581,36 @@ void printUpdatedLists() {
       final year = int.parse(match.group(3)!);
       return DateTime(year, month, day);
     }
-
-    final dayOfWeekIndex = DateFormat('EEEE').parse(dayOfWeek).weekday;
-    final daysUntilNext = DateTime.daysPerWeek - dayOfWeekIndex + DateFormat('EEEE').parse(dateText).weekday;
-    return now.add(Duration(days: daysUntilNext));
   }
+
+  throw FormatException('Invalid date format');
+}
+
+
+String _convertTime(String timeText) {
+  final timeRegex = RegExp(r'(\d{1,2}):(\d{2}) (AM|PM)');
+  final match = timeRegex.firstMatch(timeText);
+  if (match != null) {
+    final hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+    final period = match.group(3)!;
+    if (period == 'AM' && hour == 12) {
+      return '${hour - 12}:${minute.toString().padLeft(2, '0')}';
+    } else if (period == 'PM' && hour < 12) {
+      return '${hour + 12}:${minute.toString().padLeft(2, '0')}';
+    } else {
+      return '$hour:${minute.toString().padLeft(2, '0')}';
+    }
+  }
+
+  final timeRegex24 = RegExp(r'(\d{1,2}):(\d{2})');
+  final match24 = timeRegex24.firstMatch(timeText);
+  if (match24 != null) {
+    final hour = int.parse(match24.group(1)!);
+    final minute = int.parse(match24.group(2)!);
+    return '$hour:${minute.toString().padLeft(2, '0')}';
+  }
+
+  throw FormatException('Invalid time format');
+}
 }
